@@ -1,0 +1,26 @@
+[
+    {
+        "date": "2025-07-20 20:05:12",
+        "product_id": "APX_P004",
+        "product_name": "Premium USB-C Hub",
+        "carton_id": "APX_P004-C01",
+        "quantity": 20,
+        "sales_price": 650.0,
+        "purchase_price": 450.0,
+        "sales_value": 13000.0,
+        "purchase_value": 9000.0,
+        "type": "sale"
+    },
+    {
+        "date": "2025-07-20 20:06:01",
+        "product_id": "APX_P006",
+        "product_name": "Portable Power Bank 20000mAh",
+        "carton_id": "APX_P006-C01",
+        "quantity": 10,
+        "sales_price": 1600.0,
+        "purchase_price": 1200.0,
+        "sales_value": 16000.0,
+        "purchase_value": 12000.0,
+        "type": "sale"
+    }
+]
