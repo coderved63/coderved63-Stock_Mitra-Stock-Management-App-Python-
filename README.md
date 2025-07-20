@@ -48,7 +48,7 @@
 
 **Stock Mitra is designed for everyone—even if you don’t have Python installed!**
 
-1. **Download the latest Stock Mitra executable (`.exe`) from our [Google Drive link](#) or the [Releases](https://github.com/your-username/your-repo/releases) section.**
+1. **Download the latest Stock Mitra executable (`.exe`) from our [Google Drive link](https://drive.google.com/drive/folders/16ghRTsO31DUkUIWFr4tru6TuJwOqvux4?usp=sharing) or the [Releases](https://github.com/your-username/your-repo/releases) section.**
 2. **Extract the ZIP file (if provided).**
 3. **Double-click `New_Stock_mngr_app.exe` to start Stock Mitra!**
    - No installation, no setup, no Python required.
