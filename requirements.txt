@@ -1,0 +1,17 @@
+# Stock Mitra - Requirements
+# Core dependencies for the Stock Management System
+
+# GUI Framework (usually included with Python)
+# tkinter - Standard Python GUI library
+
+# Optional dependencies for future enhancements
+# matplotlib>=3.5.0  # For future chart and visualization features
+# Pillow>=8.0.0      # For image processing (if needed)
+# reportlab>=3.6.0   # For PDF generation (if implemented)
+
+# Standard library dependencies (included with Python)
+# json, datetime, os, sys, pathlib, difflib, etc.
+
+# Note: This application primarily uses Python's standard library
+# Most functionality works with a standard Python installation
+# Additional packages can be installed as needed for specific features
