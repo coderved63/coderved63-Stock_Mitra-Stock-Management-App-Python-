@@ -70,6 +70,39 @@ class UpdateCartonUI(BaseUIComponent):
         ttk.Button(button_frame, text="Clear Form", command=self.clear_update_carton_form).grid(row=0, column=0, padx=5)
         ttk.Button(button_frame, text="Perform Action", command=self.perform_update_carton).grid(row=0, column=1, padx=5)
     
+    def cleanup_transaction_logs(self, carton_id):
+        """Remove transaction entries for deleted carton."""
+        try:
+            from utils.file_utils import get_log_file_path
+            import json
+            
+            # Clean purchase log
+            purchase_log_file = get_log_file_path(self.stock_app.selected_json_file, 'purchase')
+            try:
+                with open(purchase_log_file, 'r') as f:
+                    purchase_log = json.load(f)
+                # Remove entries for deleted carton
+                purchase_log = [entry for entry in purchase_log if entry.get('carton_id') != carton_id]
+                with open(purchase_log_file, 'w') as f:
+                    json.dump(purchase_log, f, indent=2)
+            except (FileNotFoundError, json.JSONDecodeError):
+                pass  # Log file doesn't exist or is empty
+            
+            # Clean sales log
+            sales_log_file = get_log_file_path(self.stock_app.selected_json_file, 'sales')
+            try:
+                with open(sales_log_file, 'r') as f:
+                    sales_log = json.load(f)
+                # Remove entries for deleted carton
+                sales_log = [entry for entry in sales_log if entry.get('carton_id') != carton_id]
+                with open(sales_log_file, 'w') as f:
+                    json.dump(sales_log, f, indent=2)
+            except (FileNotFoundError, json.JSONDecodeError):
+                pass  # Log file doesn't exist or is empty
+                
+        except Exception as e:
+            print(f"Error cleaning up transaction logs: {e}")
+    
     def find_carton_for_update(self):
         """Find carton by ID for updating."""
         query_carton_id = self.update_carton_id_entry.get().strip().upper()
@@ -147,7 +180,11 @@ class UpdateCartonUI(BaseUIComponent):
                 # Remove the carton from the list
                 self.stock_app.stock_data[:] = [c for c in self.stock_app.stock_data if c['carton_id'] != target_carton_id]
                 save_stock_data(self.stock_app.stock_data, self.stock_app.selected_json_file)
-                messagebox.showinfo('Success', f"Carton {target_carton_id} has been permanently DELETED.")
+                
+                # Clean up transaction logs - remove entries for deleted carton
+                self.cleanup_transaction_logs(target_carton_id)
+                
+                messagebox.showinfo('Success', f"Carton {target_carton_id} has been permanently DELETED and removed from transaction logs.")
             else:
                 messagebox.showinfo('Info', 'Deletion cancelled.')
                 return

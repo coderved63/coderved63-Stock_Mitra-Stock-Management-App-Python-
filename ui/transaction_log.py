@@ -24,14 +24,14 @@ class TransactionLogUI(BaseUIComponent):
         # Title
         ttk.Label(self.frame, text="Transaction Log", style='SubHeader.TLabel').pack(pady=(0, 18))
         
-        # Transaction log table
+        # Transaction log table with detailed pricing
         self.transaction_tree = ttk.Treeview(self.frame, 
-            columns=("Date", "Type", "Product ID", "Product Name", "Carton ID", "Quantity", "Value (₹)"), 
+            columns=("Date", "Type", "Product ID", "Product Name", "Carton ID", "Quantity", "Purchase Price", "Sales Price", "MRP", "Purchase Value (₹)", "Sales Value (₹)", "Profit/Loss (₹)"), 
             show='headings', height=15)
         
-        # Configure columns
-        for col, width in zip(("Date", "Type", "Product ID", "Product Name", "Carton ID", "Quantity", "Value (₹)"), 
-                             [120, 80, 100, 180, 100, 80, 120]):
+        # Configure columns with optimized widths to fit screen
+        for col, width in zip(("Date", "Type", "Product ID", "Product Name", "Carton ID", "Quantity", "Purchase Price", "Sales Price", "MRP", "Purchase Value (₹)", "Sales Value (₹)", "Profit/Loss (₹)"), 
+                             [90, 70, 80, 120, 80, 60, 80, 80, 70, 100, 100, 100]):
             self.transaction_tree.heading(col, text=col)
             self.transaction_tree.column(col, width=width, anchor='center')
         
@@ -39,11 +39,18 @@ class TransactionLogUI(BaseUIComponent):
         scrollbar = ttk.Scrollbar(self.frame, orient="vertical", command=self.transaction_tree.yview)
         self.transaction_tree.configure(yscrollcommand=scrollbar.set)
         
-        # Pack tree and scrollbar
+        # Pack tree and scrollbars with proper frame
         tree_frame = ttk.Frame(self.frame)
         tree_frame.pack(expand=True, fill='both', pady=10)
-        self.transaction_tree.pack(side='left', expand=True, fill='both')
+        
+        # Add horizontal scrollbar for wide table
+        h_scrollbar = ttk.Scrollbar(tree_frame, orient="horizontal", command=self.transaction_tree.xview)
+        self.transaction_tree.configure(xscrollcommand=h_scrollbar.set)
+        
+        # Pack layout for scrollbars and tree
+        h_scrollbar.pack(side='bottom', fill='x')
         scrollbar.pack(side='right', fill='y')
+        self.transaction_tree.pack(side='left', expand=True, fill='both')
         
         # Buttons
         btn_frame = ttk.Frame(self.frame)
@@ -81,11 +88,19 @@ class TransactionLogUI(BaseUIComponent):
                     'product_name': entry.get('product_name', ''),
                     'carton_id': entry.get('carton_id', ''),
                     'quantity': entry.get('quantity', 0),
-                    'value': entry.get('purchase_value', entry.get('sales_value', 0))
+                    'purchase_price': entry.get('purchase_price', 0),
+                    'sales_price': entry.get('sales_price', 0),
+                    'mrp': entry.get('mrp', 0),
+                    'purchase_value': entry.get('purchase_value', 0),
+                    'sales_value': entry.get('sales_value', 0),
+                    'profit_loss': 0  # No profit/loss for purchases
                 })
             
             # Add sales transactions
             for entry in sales_log:
+                purchase_value = entry.get('purchase_value', 0)
+                sales_value = entry.get('sales_value', 0)
+                profit_loss = sales_value - purchase_value
                 all_transactions.append({
                     'date': entry.get('date', ''),
                     'type': 'Sale',
@@ -93,7 +108,12 @@ class TransactionLogUI(BaseUIComponent):
                     'product_name': entry.get('product_name', ''),
                     'carton_id': entry.get('carton_id', ''),
                     'quantity': entry.get('quantity', 0),
-                    'value': entry.get('sales_value', 0)
+                    'purchase_price': entry.get('purchase_price', 0),
+                    'sales_price': entry.get('sales_price', 0),
+                    'mrp': entry.get('mrp', 0),
+                    'purchase_value': purchase_value,
+                    'sales_value': sales_value,
+                    'profit_loss': profit_loss
                 })
             
             # Sort by date (newest first)
@@ -101,6 +121,20 @@ class TransactionLogUI(BaseUIComponent):
             
             # Insert data into tree
             for trans in all_transactions:
+                purchase_display = f"₹{trans['purchase_value']:.2f}" if trans['purchase_value'] > 0 else "N/A"
+                sales_display = f"₹{trans['sales_value']:.2f}" if trans['sales_value'] > 0 else "N/A"
+                
+                if trans['type'] == 'Purchase':
+                    profit_display = "N/A"  # No profit/loss for purchases
+                else:
+                    profit_loss = trans['profit_loss']
+                    if profit_loss > 0:
+                        profit_display = f"🟢 ₹{profit_loss:.2f}"
+                    elif profit_loss < 0:
+                        profit_display = f"🔴 ₹{abs(profit_loss):.2f}"
+                    else:
+                        profit_display = f"⚪ ₹{profit_loss:.2f}"
+                
                 self.transaction_tree.insert('', 'end', values=(
                     trans['date'],
                     trans['type'],
@@ -108,7 +142,12 @@ class TransactionLogUI(BaseUIComponent):
                     trans['product_name'],
                     trans['carton_id'],
                     trans['quantity'],
-                    f"₹{trans['value']:.2f}"
+                    f"₹{trans.get('purchase_price', 0):.2f}",
+                    f"₹{trans.get('sales_price', 0):.2f}",
+                    f"₹{trans.get('mrp', 0):.2f}" if trans.get('mrp', 0) > 0 else 'N/A',
+                    purchase_display,
+                    sales_display,
+                    profit_display
                 ))
             
             total_transactions = len(all_transactions)
@@ -134,7 +173,7 @@ class TransactionLogUI(BaseUIComponent):
                 writer = csv.writer(csvfile)
                 
                 # Write header
-                writer.writerow(["Date", "Type", "Product ID", "Product Name", "Carton ID", "Quantity", "Value (₹)"])
+                writer.writerow(["Date", "Type", "Product ID", "Product Name", "Carton ID", "Quantity", "Purchase Price", "Sales Price", "MRP", "Purchase Value (₹)", "Sales Value (₹)", "Profit/Loss (₹)"])
                 
                 # Write data
                 for item in self.transaction_tree.get_children():

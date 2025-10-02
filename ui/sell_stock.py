@@ -149,8 +149,11 @@ class SellStockUI(BaseUIComponent):
             
             units_from_this_carton = min(units_remaining, available_in_carton)
             
-            # Calculate sales value (assuming MRP as sales price)
-            sales_value = units_from_this_carton * carton.get('mrp', 0)
+            # Calculate sales value using actual sales price
+            sales_price_per_unit = carton.get('sales_price', 0)
+            purchase_price_per_unit = carton.get('purchase_price', 0)
+            sales_value = units_from_this_carton * sales_price_per_unit
+            purchase_value = units_from_this_carton * purchase_price_per_unit
             total_sales_value += sales_value
             
             # Update carton
@@ -161,7 +164,10 @@ class SellStockUI(BaseUIComponent):
             cartons_sold.append({
                 'carton_id': carton['carton_id'],
                 'units_sold': units_from_this_carton,
-                'sales_value': sales_value
+                'sales_value': sales_value,
+                'purchase_value': purchase_value,
+                'sales_price': sales_price_per_unit,
+                'purchase_price': purchase_price_per_unit
             })
             
             units_remaining -= units_from_this_carton
@@ -172,13 +178,19 @@ class SellStockUI(BaseUIComponent):
         # Log the sale
         sales_log_file = get_log_file_path(self.stock_app.selected_json_file, 'sales')
         for sale in cartons_sold:
+            # Find the original carton to get MRP
+            original_carton = next((c for c in self.stock_app.stock_data if c['carton_id'] == sale['carton_id']), {})
             append_log_entry(sales_log_file, {
                 'date': datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
                 'product_id': self.identified_product_id_for_sale,
                 'product_name': next(c['product_name'] for c in self.stock_app.stock_data if c['product_id'] == self.identified_product_id_for_sale),
                 'carton_id': sale['carton_id'],
                 'quantity': sale['units_sold'],
+                'sales_price': sale['sales_price'],
+                'purchase_price': sale['purchase_price'],
+                'mrp': original_carton.get('mrp', 0),
                 'sales_value': sale['sales_value'],
+                'purchase_value': sale['purchase_value'],
                 'type': 'sale'
             })
         

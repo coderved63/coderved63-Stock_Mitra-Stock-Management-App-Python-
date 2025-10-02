@@ -160,13 +160,24 @@ class AddStockUI(BaseUIComponent):
             damaged_entry.grid(row=3, column=0, padx=5, pady=2, sticky='ew')
             damaged_entry.insert(0, "0")  # Default to 0 damaged
             
-            ttk.Label(carton_label_frame, text="MRP:").grid(row=4, column=0, padx=5, pady=2, sticky='w')
+            ttk.Label(carton_label_frame, text="Sales Price:").grid(row=4, column=0, padx=5, pady=2, sticky='w')
+            sales_price_entry = ttk.Entry(carton_label_frame)
+            sales_price_entry.grid(row=5, column=0, padx=5, pady=2, sticky='ew')
+            
+            ttk.Label(carton_label_frame, text="Purchase Price:").grid(row=6, column=0, padx=5, pady=2, sticky='w')
+            purchase_price_entry = ttk.Entry(carton_label_frame)
+            purchase_price_entry.grid(row=7, column=0, padx=5, pady=2, sticky='ew')
+            
+            ttk.Label(carton_label_frame, text="MRP (Optional):").grid(row=8, column=0, padx=5, pady=2, sticky='w')
             mrp_entry = ttk.Entry(carton_label_frame)
-            mrp_entry.grid(row=5, column=0, padx=5, pady=2, sticky='ew')
+            mrp_entry.grid(row=9, column=0, padx=5, pady=2, sticky='ew')
+            mrp_entry.insert(0, "0")  # Default to 0
             
             self.carton_entries.append({
                 'qty_entry': qty_entry,
                 'damaged_entry': damaged_entry,
+                'sales_price_entry': sales_price_entry,
+                'purchase_price_entry': purchase_price_entry,
                 'mrp_entry': mrp_entry
             })
             carton_label_frame.columnconfigure(0, weight=1)
@@ -196,12 +207,20 @@ class AddStockUI(BaseUIComponent):
             try:
                 qty = int(entry_set['qty_entry'].get())
                 damaged = int(entry_set['damaged_entry'].get())
-                mrp = float(entry_set['mrp_entry'].get())
-                if qty <= 0 or damaged < 0 or damaged > qty or mrp < 0:
+                sales_price = float(entry_set['sales_price_entry'].get())
+                purchase_price = float(entry_set['purchase_price_entry'].get())
+                mrp = float(entry_set['mrp_entry'].get()) if entry_set['mrp_entry'].get().strip() else 0
+                if qty <= 0 or damaged < 0 or damaged > qty or sales_price < 0 or purchase_price < 0 or mrp < 0:
                     raise ValueError
-                cartons_data_for_add.append({'quantity': qty, 'damaged': damaged, 'mrp': mrp})
+                cartons_data_for_add.append({
+                    'quantity': qty, 
+                    'damaged': damaged, 
+                    'sales_price': sales_price,
+                    'purchase_price': purchase_price,
+                    'mrp': mrp
+                })
             except ValueError:
-                messagebox.showerror('Error', 'Please enter valid positive numbers for quantity and MRP, and non-negative for damaged units (damaged <= quantity).')
+                messagebox.showerror('Error', 'Please enter valid positive numbers for sales price, purchase price and quantity, and non-negative for damaged units (damaged <= quantity).')
                 return
         
         # Check for product ID/name conflict
@@ -237,6 +256,8 @@ class AddStockUI(BaseUIComponent):
                 "expiry_date": expiry_date_str if expiry_date_str else None,
                 "last_updated": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
                 "date_outwarded": None,
+                "sales_price": carton_detail['sales_price'],
+                "purchase_price": carton_detail['purchase_price'],
                 "mrp": carton_detail['mrp']
             }
             self.stock_app.stock_data.append(new_carton)
@@ -250,7 +271,11 @@ class AddStockUI(BaseUIComponent):
                 'product_name': product_name,
                 'carton_id': carton_id,
                 'quantity': carton_detail['quantity'],
+                'sales_price': carton_detail['sales_price'],
+                'purchase_price': carton_detail['purchase_price'],
                 'mrp': carton_detail['mrp'],
+                'sales_value': carton_detail['quantity'] * carton_detail['sales_price'],
+                'purchase_value': carton_detail['quantity'] * carton_detail['purchase_price'],
                 'type': 'purchase',
             })
         
@@ -300,6 +325,9 @@ class AddStockUI(BaseUIComponent):
                         'product_id': item['product_id'],
                         'product_name': item['product_name'],
                         'location': item.get('location', ''),
+                        'sales_price': item.get('sales_price', 0),
+                        'purchase_price': item.get('purchase_price', 0),
+                        'mrp': item.get('mrp', 0),
                         'display': f"{item['product_id']} - {item['product_name']}"
                     })
                     seen_products.add(product_key)
@@ -381,6 +409,16 @@ class AddStockUI(BaseUIComponent):
             if selected_suggestion['location'] and not self.add_location_entry.get():
                 self.add_location_entry.delete(0, tk.END)
                 self.add_location_entry.insert(0, selected_suggestion['location'])
+            
+            # Auto-fill price fields for all cartons if they have pricing info
+            if selected_suggestion.get('sales_price', 0) > 0 or selected_suggestion.get('purchase_price', 0) > 0 or selected_suggestion.get('mrp', 0) > 0:
+                for carton_entry in self.carton_entries:
+                    if selected_suggestion.get('sales_price', 0) > 0 and not carton_entry['sales_price_entry'].get():
+                        carton_entry['sales_price_entry'].insert(0, str(selected_suggestion['sales_price']))
+                    if selected_suggestion.get('purchase_price', 0) > 0 and not carton_entry['purchase_price_entry'].get():
+                        carton_entry['purchase_price_entry'].insert(0, str(selected_suggestion['purchase_price']))
+                    if selected_suggestion.get('mrp', 0) > 0 and not carton_entry['mrp_entry'].get():
+                        carton_entry['mrp_entry'].insert(0, str(selected_suggestion['mrp']))
             
             # Hide suggestions
             self.hide_suggestions()
@@ -465,6 +503,14 @@ class AddStockUI(BaseUIComponent):
             if selected_suggestion['location'] and not self.add_location_entry.get():
                 self.add_location_entry.delete(0, tk.END)
                 self.add_location_entry.insert(0, selected_suggestion['location'])
+            
+            # Auto-fill price fields for all cartons if they have pricing info
+            if selected_suggestion.get('sales_price', 0) > 0 or selected_suggestion.get('purchase_price', 0) > 0:
+                for carton_entry in self.carton_entries:
+                    if selected_suggestion.get('sales_price', 0) > 0 and not carton_entry['sales_price_entry'].get():
+                        carton_entry['sales_price_entry'].insert(0, str(selected_suggestion['sales_price']))
+                    if selected_suggestion.get('purchase_price', 0) > 0 and not carton_entry['purchase_price_entry'].get():
+                        carton_entry['purchase_price_entry'].insert(0, str(selected_suggestion['purchase_price']))
             
             # Hide suggestions
             self.hide_name_suggestions()

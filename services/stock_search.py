@@ -42,8 +42,16 @@ def get_product_summary_text(query, all_stock_data):
 
     found_cartons = [carton for carton in all_stock_data if carton['product_id'] == product_id_found]
 
-    # Collect all unique MRPs for this product
-    unique_mrps = sorted(set([carton.get('mrp', 0) for carton in found_cartons if carton.get('mrp') is not None]))
+    # Collect pricing information for this product
+    unique_sales_prices = sorted(set([carton.get('sales_price', 0) for carton in found_cartons if carton.get('sales_price') is not None]))
+    unique_mrps = sorted(set([carton.get('mrp', 0) for carton in found_cartons if carton.get('mrp') is not None and carton.get('mrp') > 0]))
+    price_text = ''
+    if unique_sales_prices:
+        if len(unique_sales_prices) == 1:
+            price_text = f"Sales Price: ₹{unique_sales_prices[0]:.2f}"
+        else:
+            price_text = "Sales Prices: " + ", ".join([f"₹{price:.2f}" for price in unique_sales_prices])
+    
     mrp_text = ''
     if unique_mrps:
         if len(unique_mrps) == 1:
@@ -107,6 +115,8 @@ def get_product_summary_text(query, all_stock_data):
 
     summary_lines = []
     summary_lines.append(f"Searching for {product_name_found} ({product_id_found}).\n")
+    if price_text:
+        summary_lines.append(price_text)
     if mrp_text:
         summary_lines.append(mrp_text)
     summary_lines.append("---")

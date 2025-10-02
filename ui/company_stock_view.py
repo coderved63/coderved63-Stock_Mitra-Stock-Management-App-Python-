@@ -93,13 +93,12 @@ class CompanyStockViewUI(BaseUIComponent):
                 aggregated_products[product_id] = {
                     'productId': carton['product_id'],
                     'productName': carton['product_name'],
-                    'mrp_per_piece_sum': 0,
                     'purchase_per_piece_sum': 0,
                     'sales_per_piece_sum': 0,
-                    'mrp_per_piece_count': 0,
                     'purchase_per_piece_count': 0,
                     'sales_per_piece_count': 0,
-                    'mrp': carton.get('mrp'),
+                    'mrp_sum': 0,
+                    'mrp_count': 0,
                     'totalLiveCartons': 0,
                     'totalLivePieces': 0,
                     'totalDamagedUnits': 0,
@@ -115,17 +114,16 @@ class CompanyStockViewUI(BaseUIComponent):
             product = aggregated_products[product_id]
             product['locations'].add(carton['location'])
 
-            # Calculate per piece prices
-            qty = carton.get('quantity_per_carton', 0)
-            if carton.get('mrp') is not None and qty:
-                product['mrp_per_piece_sum'] += carton['mrp'] / qty
-                product['mrp_per_piece_count'] += 1
-            if carton.get('purchase_price') is not None and qty:
-                product['purchase_per_piece_sum'] += carton['purchase_price'] / qty
+            # Calculate per piece prices (prices in our data model are already per piece)
+            if carton.get('purchase_price') is not None:
+                product['purchase_per_piece_sum'] += carton['purchase_price']
                 product['purchase_per_piece_count'] += 1
-            if carton.get('sales_price') is not None and qty:
-                product['sales_per_piece_sum'] += carton['sales_price'] / qty
+            if carton.get('sales_price') is not None:
+                product['sales_per_piece_sum'] += carton['sales_price']
                 product['sales_per_piece_count'] += 1
+            if carton.get('mrp') is not None and carton.get('mrp') > 0:
+                product['mrp_sum'] += carton['mrp']
+                product['mrp_count'] += 1
 
             if carton['date_outwarded'] is None:
                 product['hasActiveStock'] = True
@@ -186,7 +184,7 @@ class CompanyStockViewUI(BaseUIComponent):
         # Create Treeview for table display with better column layout
         columns = ("Product ID", "Product Name", "Cartons (Live)", "Pieces (Live)", 
                    "Damaged/Expired", "Earliest Inwarded", "Earliest Expires", 
-                   "Last Outwarded", "MRP per Piece", "Purchase Price per Piece", "Sales Price per Piece", "Locations", "Status")
+                   "Last Outwarded", "Purchase Price per Piece", "Sales Price per Piece", "Avg MRP", "Locations", "Status")
         
         # Create frame for treeview with scrollbars
         tree_frame = ttk.Frame(self.content_frame)
@@ -216,8 +214,8 @@ class CompanyStockViewUI(BaseUIComponent):
         tree_frame.grid_columnconfigure(0, weight=1)
         tree_frame.grid_rowconfigure(0, weight=1)
         
-        # Better column widths for proper display
-        col_widths = [100, 200, 90, 90, 120, 110, 110, 110, 110, 130, 120, 150, 120]
+        # Better column widths for proper display - optimized to fit screen
+        col_widths = [80, 140, 70, 70, 90, 90, 90, 90, 85, 85, 70, 100, 80]
         for col, width in zip(columns, col_widths):
             self.tree.heading(col, text=col, anchor=tk.CENTER)
             self.tree.column(col, width=width, anchor=tk.CENTER, minwidth=width)
@@ -232,9 +230,9 @@ class CompanyStockViewUI(BaseUIComponent):
             elif product['hasExpiredStock'] or product['hasDamagedStock']:
                 status_text = 'Some Damaged/Expired'
             
-            avg_mrp_per_piece = product['mrp_per_piece_sum'] / product['mrp_per_piece_count'] if product['mrp_per_piece_count'] else 0
             avg_purchase_per_piece = product['purchase_per_piece_sum'] / product['purchase_per_piece_count'] if product['purchase_per_piece_count'] else 0
             avg_sales_per_piece = product['sales_per_piece_sum'] / product['sales_per_piece_count'] if product['sales_per_piece_count'] else 0
+            avg_mrp = product['mrp_sum'] / product['mrp_count'] if product['mrp_count'] else 0
             
             # Insert row with proper formatting
             item_id = self.tree.insert("", tk.END, values=(
@@ -246,9 +244,9 @@ class CompanyStockViewUI(BaseUIComponent):
                 self.format_date(product['earliestInwarded']) if product['earliestInwarded'].year != 9999 else 'N/A',
                 self.format_date(product['earliestExpiry']) if product['earliestExpiry'].year != 9999 else 'N/A',
                 self.format_date(product['latestOutwarded']) if product['latestOutwarded'].year != 1 else 'N/A',
-                f"₹{avg_mrp_per_piece:.2f}" if avg_mrp_per_piece else 'N/A',
                 f"₹{avg_purchase_per_piece:.2f}" if avg_purchase_per_piece else 'N/A',
                 f"₹{avg_sales_per_piece:.2f}" if avg_sales_per_piece else 'N/A',
+                f"₹{avg_mrp:.2f}" if avg_mrp else 'N/A',
                 ", ".join(sorted(list(product['locations']))),
                 status_text
             ))
@@ -260,3 +258,102 @@ class CompanyStockViewUI(BaseUIComponent):
                 self.tree.set(item_id, 'Status', '✅ ' + status_text)
             elif 'Damaged' in status_text or 'Expired' in status_text:
                 self.tree.set(item_id, 'Status', '⚠️ ' + status_text)
+        
+        # Add detailed carton information section
+        self.create_detailed_carton_view(company_stock)
+    
+    def create_detailed_carton_view(self, company_stock):
+        """Create detailed view of all individual cartons with Carton IDs."""
+        # Detailed Carton Information Section
+        ttk.Label(self.content_frame, text="🔍 Detailed Carton Information (All Cartons with IDs for Updates)", 
+                 font=('Segoe UI', 14, 'bold')).pack(pady=(20, 10))
+        
+        # Create frame for detailed carton treeview
+        detail_tree_frame = ttk.Frame(self.content_frame)
+        detail_tree_frame.pack(expand=True, fill='both', pady=10)
+        
+        # Detailed carton columns including Carton ID prominently
+        detail_columns = ("Carton ID", "Product ID", "Product Name", "Location", "Quantity", 
+                         "Damaged", "Purchase Price", "Sales Price", "MRP", "Inwarded", "Expires", "Status")
+        
+        self.detail_tree = ttk.Treeview(detail_tree_frame, columns=detail_columns, show='headings', height=12)
+        
+        # Configure detail tree styling
+        style = ttk.Style()
+        style.configure("Detail.Treeview", rowheight=25)
+        style.configure("Detail.Treeview.Heading", font=('Segoe UI', 10, 'bold'))
+        style.configure("Detail.Treeview", font=('Segoe UI', 9))
+        
+        # Configure columns with appropriate widths
+        for col, width in zip(detail_columns, [100, 90, 180, 80, 70, 70, 80, 80, 80, 90, 90, 100]):
+            self.detail_tree.heading(col, text=col)
+            self.detail_tree.column(col, width=width, anchor='center')
+        
+        # Vertical scrollbar for detailed view
+        detail_v_scrollbar = ttk.Scrollbar(detail_tree_frame, orient="vertical", command=self.detail_tree.yview)
+        self.detail_tree.configure(yscrollcommand=detail_v_scrollbar.set)
+        
+        # Horizontal scrollbar for detailed view
+        detail_h_scrollbar = ttk.Scrollbar(detail_tree_frame, orient="horizontal", command=self.detail_tree.xview)
+        self.detail_tree.configure(xscrollcommand=detail_h_scrollbar.set)
+        
+        # Pack scrollbars and tree
+        self.detail_tree.pack(side="left", fill="both", expand=True)
+        detail_v_scrollbar.pack(side="right", fill="y")
+        detail_h_scrollbar.pack(side="bottom", fill="x")
+        
+        # Sort cartons by Product ID, then by Carton ID
+        sorted_cartons = sorted(company_stock, key=lambda x: (x['product_id'], x['carton_id']))
+        current_date = datetime.date.today()
+        
+        # Populate detailed carton information
+        for carton in sorted_cartons:
+            # Determine carton status
+            carton_status = "Active"
+            if carton['date_outwarded']:
+                carton_status = "Outwarded"
+            elif carton['expiry_date']:
+                try:
+                    expiry_date_obj = self.parse_date(carton['expiry_date'])
+                    if expiry_date_obj and expiry_date_obj <= current_date:
+                        carton_status = "Expired"
+                    elif expiry_date_obj and (expiry_date_obj - current_date).days <= 30:
+                        carton_status = "Expiring Soon"
+                except:
+                    pass
+            
+            if carton['damaged_units'] > 0 and carton_status == "Active":
+                carton_status = "Has Damage"
+            
+            # Insert carton data
+            item_id = self.detail_tree.insert('', 'end', values=(
+                carton['carton_id'],
+                carton['product_id'],
+                carton['product_name'],
+                carton['location'],
+                carton['quantity_per_carton'],
+                carton['damaged_units'],
+                f"₹{carton.get('purchase_price', 0):.2f}",
+                f"₹{carton.get('sales_price', 0):.2f}",
+                f"₹{carton.get('mrp', 0):.2f}" if carton.get('mrp', 0) > 0 else 'N/A',
+                carton['date_inwarded'],
+                carton['expiry_date'] if carton['expiry_date'] else 'N/A',
+                carton_status
+            ))
+            
+            # Color coding for carton status
+            if carton_status == 'Outwarded':
+                self.detail_tree.set(item_id, 'Status', '❌ ' + carton_status)
+            elif carton_status == 'Expired':
+                self.detail_tree.set(item_id, 'Status', '🔴 ' + carton_status)
+            elif carton_status == 'Expiring Soon':
+                self.detail_tree.set(item_id, 'Status', '🟡 ' + carton_status)
+            elif carton_status == 'Has Damage':
+                self.detail_tree.set(item_id, 'Status', '⚠️ ' + carton_status)
+            else:
+                self.detail_tree.set(item_id, 'Status', '✅ ' + carton_status)
+        
+        # Add instruction label
+        ttk.Label(self.content_frame, 
+                 text="💡 Tip: Use the Carton ID from above to update individual cartons in the 'Update Carton' tab",
+                 font=('Segoe UI', 11, 'italic')).pack(pady=(10, 0))

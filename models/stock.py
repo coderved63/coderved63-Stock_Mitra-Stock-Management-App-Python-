@@ -18,7 +18,9 @@ class StockCarton:
     date_inwarded: str
     expiry_date: Optional[str]
     location: str
-    mrp: float
+    sales_price: float
+    purchase_price: float
+    mrp: float = 0
     date_outwarded: Optional[str] = None
     
     def to_dict(self):
@@ -32,6 +34,8 @@ class StockCarton:
             'date_inwarded': self.date_inwarded,
             'expiry_date': self.expiry_date,
             'location': self.location,
+            'sales_price': self.sales_price,
+            'purchase_price': self.purchase_price,
             'mrp': self.mrp,
             'date_outwarded': self.date_outwarded
         }
@@ -48,6 +52,8 @@ class StockCarton:
             date_inwarded=data['date_inwarded'],
             expiry_date=data.get('expiry_date'),
             location=data['location'],
-            mrp=data['mrp'],
+            sales_price=data['sales_price'],
+            purchase_price=data['purchase_price'],
+            mrp=data.get('mrp', 0),
             date_outwarded=data.get('date_outwarded')
         )

@@ -36,7 +36,7 @@ class StockAnalyzer:
                 else:
                     total_live += c['quantity_per_carton']
                     total_damaged_expired += c['damaged_units']
-                    total_stock_value += c['quantity_per_carton'] * c.get('mrp', 0)
+                    total_stock_value += c['quantity_per_carton'] * c.get('sales_price', 0)
                     
                     # Low stock check
                     if c['quantity_per_carton'] <= LOW_STOCK_THRESHOLD:
@@ -88,11 +88,18 @@ class StockValidator:
             errors.append("Damaged units must be a valid number")
         
         try:
-            mrp = float(form_data.get('mrp', 0))
-            if mrp < 0:
-                errors.append("MRP cannot be negative")
+            sales_price = float(form_data.get('sales_price', 0))
+            if sales_price < 0:
+                errors.append("Sales price cannot be negative")
         except ValueError:
-            errors.append("MRP must be a valid number")
+            errors.append("Sales price must be a valid number")
+        
+        try:
+            purchase_price = float(form_data.get('purchase_price', 0))
+            if purchase_price < 0:
+                errors.append("Purchase price cannot be negative")
+        except ValueError:
+            errors.append("Purchase price must be a valid number")
         
         if not form_data.get('location'):
             errors.append("Location is required")
